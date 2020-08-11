@@ -1,0 +1,125 @@
+version: "3.4"
+
+services:
+
+  cti_iot_clickhouse:
+    build:
+      context: clickhouse/
+      dockerfile: ./Dockerfile
+    image: cti/iot-clickhouse:3.0.0-SNAPSHOT
+    container_name: cti_iot_clickhouse
+    restart: always
+    hostname: cti_iot_clickhouse
+    ports:
+      - 8123:8123
+      - 9000:9000
+    networks:
+      - iot_network
+
+  cti_iot_postgres:
+    image: postgres:10.4
+    container_name: cti_iot_postgres
+    hostname: cti_iot_postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: iot_domain
+    ports:
+      - 15432:5432
+    tty: true
+    networks:
+      - iot_network
+
+  cti_iot_consul:
+    image: consul:1.1.0
+    container_name: cti_iot_consul
+    hostname: cti_iot_consul
+    restart: always
+    environment:
+      CONSUL_LOCAL_CONFIG: '{"datacenter":"iot_dock", "server":true, "enable_debug":true}'
+    command: agent -ui -data-dir /consul/data -server -bootstrap-expect 1 -client 0.0.0.0 -log-level debug
+    ports:
+      - "8300:8302/tcp"
+      - "8500:8500/tcp"
+      - "8301-8302:8301-8302/udp"
+      - "8600:8600/tcp"
+      - "8600:8600/udp"
+    tty: true
+    networks:
+      - iot_network
+
+  cti_iot_argon:
+    image: cti/iot-argon:3.0.0-SNAPSHOT
+    container_name: cti_iot_argon
+    hostname: cti_iot_argon
+    restart: always
+    depends_on:
+      - "cti_iot_consul"
+      - "cti_iot_clickhouse"
+    ports:
+      - 11099:1099
+      - 15005:5005
+      - 18101:8101
+      - 44441:44444
+    tty: true
+    networks:
+      - iot_network
+    links:
+      - "cti_iot_consul:cti.iot.consul"
+      - "cti_iot_clickhouse:cti.iot.clickhouse"
+
+  cti_iot_front:
+    build:
+      context: front/
+      dockerfile: ./Dockerfile
+    image: cti/iot-front:3.0.0-SNAPSHOT
+    container_name: cti_iot_front
+    restart: always
+    hostname: cti_iot_front
+    depends_on:
+      - "cti_iot_gateway"
+    ports:
+      - 18181:80
+    networks:
+      - iot_network
+
+  cti_iot_gateway:
+    image: cti/iot-gateway:3.0.0-SNAPSHOT
+    container_name: cti_iot_gateway
+    hostname: cti_iot_gateway
+    restart: always
+    depends_on:
+      - "cti_iot_consul"
+      - "cti_iot_application_rest"
+    environment:
+      - "SPRING_PROFILES_ACTIVE=docker"
+    ports:
+      - 18080:18080
+      - 19999:9999
+    tty: true
+    networks:
+      - iot_network
+
+  cti_iot_application_rest:
+    image: cti/iot-application-rest:3.0.0-SNAPSHOT
+    container_name: cti_iot_application_rest
+    hostname: cti_iot_application_rest
+    restart: always
+    depends_on:
+      - "cti_iot_postgres"
+    environment:
+      - "SPRING_PROFILES_ACTIVE=docker"
+    ports:
+      - 18090:18090
+    tty: true
+    networks:
+      - iot_network
+
+networks:
+  iot_network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: "10.155.0.1/16"
