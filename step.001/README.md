@@ -1,4 +1,4 @@
-#Step.01 Run first Docker container hello-world / lifecycle
+# Step.01 Run first Docker container hello-world / lifecycle
 
 1.1 
 ```bash

@@ -1,4 +1,4 @@
-#Step.02 Build a custom image from Dockerfile
+# Step.02 Build a custom image from Dockerfile
 
 2.1
 Find source image of OS (CentOS for example)
